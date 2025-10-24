@@ -1,0 +1,21 @@
+name: First Workflow
+
+on:
+  push:
+   branches:
+    - main
+
+jobs:
+  example-job:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Print a welcome message
+        run: echo "welcome"
+
+      - name: Checkout
+        uses: actions/checkout@v5.0.0
+        
+      - name: Print working directory
+        run: pwd
+      - name: List all files
+        run: ls -la
