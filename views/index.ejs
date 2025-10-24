@@ -1,0 +1,46 @@
+<form action="/convert" method="POST">
+  <div class="converter">
+    <label>Category:</label>
+    <select name="measure" id="measure" required>
+      <option value="">Select Category</option>
+      <% measures.forEach(m => { %>
+        <option value="<%= m %>"><%= m.charAt(0).toUpperCase() + m.slice(1) %></option>
+      <% }) %>
+    </select>
+
+    <label>From:</label>
+    <select name="from" id="from" required></select>
+
+    <label>To:</label>
+    <select name="to" id="to" required></select>
+
+    <label>Value:</label>
+    <input type="number" name="value" step="any" required>
+
+    <button type="submit">Convert</button>
+  </div>
+</form>
+
+<% if (result !== null) { %>
+  <div class="result">
+    <h2>Result: <%= result %></h2>
+  </div>
+<% } %>
+
+<script>
+  const measureSelect = document.getElementById("measure");
+  const fromSelect = document.getElementById("from");
+  const toSelect = document.getElementById("to");
+
+  measureSelect.addEventListener("change", async () => {
+    const res = await fetch("/units", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: "measure=" + measureSelect.value,
+    });
+    const units = await res.json();
+    fromSelect.innerHTML = units.map(u => `<option value="${u}">${u}</option>`).join('');
+    toSelect.innerHTML = units.map(u => `<option value="${u}">${u}</option>`).join('');
+  });
+</script>
+
