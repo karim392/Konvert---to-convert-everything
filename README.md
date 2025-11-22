@@ -1,7 +1,5 @@
 # Konvert
 
-Test to push
-
 How to run the app.
 
 ~ node server.js
