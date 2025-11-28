@@ -208,3 +208,10 @@ resource "aws_wafv2_web_acl_association" "konvert_waf_alb" {
 }
 
 
+#outputs.tf
+# Need the IP address of EC2 instances
+output "ec2_public_ips" {
+  description = "The public IPs of the EC2 instances"
+  value       = aws_instance.app_server.*.public_ip
+}
+
