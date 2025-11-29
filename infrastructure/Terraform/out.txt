@@ -1,0 +1,13 @@
+konvert-alb-1033767915.us-east-1.elb.amazonaws.com
+
+terraform output
+alb_dns_name = "konvert-alb-1033767915.us-east-1.elb.amazonaws.com"
+ec2_public_ip_addresses = [
+  "44.192.5.134",
+  "54.145.157.169",
+]
+ec2_public_ips = [
+  "44.192.5.134",
+  "54.145.157.169",
+]
+vpc_id = "vpc-01d509fdbc667d3e1"
