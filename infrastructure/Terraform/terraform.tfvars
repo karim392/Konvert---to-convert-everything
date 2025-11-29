@@ -12,6 +12,6 @@ private_subnet_cidr = [
 ]
 
 db_username = "admin"
-db_password = "1234"
+db_password = "admin12345!!"
 
 ami_id = "ami-0c02fb55956c7d316"

@@ -17,6 +17,7 @@ resource "aws_subnet" "public" {
   vpc_id                  = aws_vpc.Konvert_VPC.id
   cidr_block              = var.public_subnet_cidr[count.index]
   count                   = length(var.public_subnet_cidr)
+  availability_zone       = element(["us-east-1a", "us-east-1b"], count.index)
   map_public_ip_on_launch = true
   tags = {
     Name = "APP-Konvert-public-subnet-${count.index + 1}"
@@ -28,6 +29,7 @@ resource "aws_subnet" "private" {
   vpc_id     = aws_vpc.Konvert_VPC.id
   cidr_block = var.private_subnet_cidr[count.index]
   count      = length(var.private_subnet_cidr)
+  availability_zone = element(["us-east-1a", "us-east-1b"], count.index)
   tags = {
     Name = "DB-Konvert-private-subnet-${count.index + 1}"
   }
@@ -37,10 +39,34 @@ resource "aws_subnet" "private" {
 #initiate Internet Gateway
 resource "aws_internet_gateway" "igw" {
   vpc_id = aws_vpc.Konvert_VPC.id
+  depends_on = [aws_vpc.Konvert_VPC]
 
   tags = {
     Name = "${var.project_name}-igw"
   }
+}
+
+
+#initiate Route Table for public subnet
+resource "aws_route_table" "public_rt" {
+  vpc_id = aws_vpc.Konvert_VPC.id
+  tags = {
+    Name = "${var.project_name}-public-route-table"
+  }
+}
+
+#Create route to Internet Gateway
+resource "aws_route" "public_route" {
+  route_table_id         = aws_route_table.public_rt.id
+  destination_cidr_block = "0.0.0.0/0"
+  gateway_id             = aws_internet_gateway.igw.id
+}
+
+#Associate Route Table with public subnet
+resource "aws_route_table_association" "public_rt_assoc" {
+  subnet_id      = aws_subnet.public.*.id[count.index]
+  route_table_id = aws_route_table.public_rt.id
+  count          = length(aws_subnet.public.*.id)
 }
 
 
@@ -49,10 +75,44 @@ resource "aws_lb" "Konvert_ALB" {
   subnets            = aws_subnet.public.*.id
   name               = "${var.project_name}-alb"
   load_balancer_type = "application"
+  internal          = false
+  security_groups    = [aws_security_group.alb_sg.id]
   tags = {
     Name = "${var.project_name}-alb"
   }
 }
+
+#ALB Target Group
+resource "aws_lb_target_group" "alb_target_group" {
+  name     = "${var.project_name}-target-group"
+  port     = 80
+  protocol = "HTTP"
+  vpc_id   = aws_vpc.Konvert_VPC.id
+  target_type = "instance"
+  health_check {
+    path                = "/"
+    protocol            = "HTTP"
+    matcher             = "200"
+    interval            = 30
+    timeout             = 5
+    healthy_threshold   = 2
+    unhealthy_threshold = 2
+  }
+}
+
+#ALB Listener
+resource "aws_lb_listener" "alb_listener" {
+  load_balancer_arn = aws_lb.Konvert_ALB.arn
+  port              = "80"
+  protocol          = "HTTP"
+
+  default_action {
+    type             = "forward"
+    target_group_arn = aws_lb_target_group.alb_target_group.arn
+  }
+}
+
+
 
 #Allow HTTP and HTTPS traffic
 resource "aws_security_group" "alb_sg" {
@@ -71,6 +131,12 @@ resource "aws_security_group" "alb_sg" {
     from_port   = 443
     to_port     = 443
     protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
     cidr_blocks = ["0.0.0.0/0"]
   }
 }
@@ -96,10 +162,11 @@ data "aws_ami" "ubuntu" {
 #Create EC2 in the public subnet
 
 resource "aws_instance" "app_server" {
-  ami                         = var.ami_id
+  ami                         = data.aws_ami.ubuntu.id
   instance_type               = var.instance_type
   subnet_id                   = element(aws_subnet.public.*.id, count.index)
   count                       = 2
+  vpc_security_group_ids      = [aws_security_group.ec2_sg.id]
   associate_public_ip_address = true
 
   tags = {
@@ -129,8 +196,10 @@ resource "aws_db_subnet_group" "konvert_db_subnet" {
 
 #Create RDS in the private subnet
 resource "aws_db_instance" "konvert_db" {
+  identifier          = "${var.project_name}-primary-db"
   allocated_storage    = 20
   engine               = "mysql"
+  backup_retention_period = 1
   engine_version       = "8.0"
   instance_class       = "db.t3.micro"
   db_name              = "${var.project_name}_db"
@@ -169,7 +238,9 @@ resource "aws_security_group" "rds_sg" {
 
 #Create replica for RDS
 resource "aws_db_instance" "konvert_db_replica" {
-  replicate_source_db  = aws_db_instance.konvert_db.id
+  depends_on          = [aws_db_instance.konvert_db]
+  identifier          = "${var.project_name}-replica-db"
+  replicate_source_db  = aws_db_instance.konvert_db.identifier
   instance_class       = "db.t3.micro"
   parameter_group_name = "default.mysql8.0"
   skip_final_snapshot  = true
@@ -196,9 +267,9 @@ resource "aws_wafv2_web_acl" "konvert_waf" {
 
 
 # Route53 Hosted Zone
-resource "aws_route53_zone" "konvert_zone" {
-  name = "konvert.example.com"
-}
+#resource "aws_route53_zone" "konvert_zone" {
+#  name = "konvert.example.com"
+#}
 
 
 #Associate WAF with ALB
@@ -208,9 +279,8 @@ resource "aws_wafv2_web_acl_association" "konvert_waf_alb" {
 }
 
 
-#outputs.tf
 # Need the IP address of EC2 instances
-output "ec2_public_ips" {
+output "ec2_public_ip_addresses" {
   description = "The public IPs of the EC2 instances"
   value       = aws_instance.app_server.*.public_ip
 }
