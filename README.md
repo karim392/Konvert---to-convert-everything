@@ -24,10 +24,10 @@ This project demonstrates a complete **end-to-end DevOps workflow**
 
 ---
 
-## 🐳 Docker
+🐳 **Docker**
 
 - The Node.js application is packaged into a Docker image.
-- The image is automatically built and pushed to **Docker Hub**.
+- The image is automatically built and pushed to Docker Hub.
 
 **Docker Image**
 
@@ -35,7 +35,7 @@ karimrushdy/konvert_to_convert
 
 ---
 
-## ☁️ Infrastructure (Terraform)
+☁️ **Infrastructure (Terraform)**
 
 Terraform provisions the full AWS infrastructure including:
 
@@ -97,15 +97,15 @@ note: Enbed a Bash script to extract the EC2 public IP in temp inventory and use
 
 
 
-### Terraform Commands
+# Terraform Commands
 
-terraform init
-terraform plan
-terraform apply
+- terraform init
+- terraform plan
+- terraform apply
 
 ---
 
-⚙️ Configuration Management (Ansible)
+⚙️ **Configuration Management (Ansible)**
 
 Ansible is used to configure the EC2 instances after creation:
 
@@ -124,7 +124,7 @@ ansible-playbook -i temp_inventory playbook.yml
 
 ---
 
-🔄 CI/CD Pipeline (GitHub Actions)
+🔄 **CI/CD Pipeline (GitHub Actions)**
 
 The CI/CD pipeline runs automatically on every push to the main branch.
 
@@ -171,7 +171,7 @@ SSH_PRIVATE_KEY
 
 After deployment, access the application via:
 
-http://<LOAD-BALANCER-DNS>
+http://**Load balancer DNS**
 
 
 
