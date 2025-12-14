@@ -15,3 +15,5 @@ db_username = "admin"
 db_password = "admin12345!!"
 
 ami_id = "ami-0c02fb55956c7d316"
+
+SSH_key_name = "SSH-key"

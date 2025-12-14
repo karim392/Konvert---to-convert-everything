@@ -26,9 +26,9 @@ resource "aws_subnet" "public" {
 
 #initiate private Subnet
 resource "aws_subnet" "private" {
-  vpc_id     = aws_vpc.Konvert_VPC.id
-  cidr_block = var.private_subnet_cidr[count.index]
-  count      = length(var.private_subnet_cidr)
+  vpc_id            = aws_vpc.Konvert_VPC.id
+  cidr_block        = var.private_subnet_cidr[count.index]
+  count             = length(var.private_subnet_cidr)
   availability_zone = element(["us-east-1a", "us-east-1b"], count.index)
   tags = {
     Name = "DB-Konvert-private-subnet-${count.index + 1}"
@@ -38,7 +38,7 @@ resource "aws_subnet" "private" {
 
 #initiate Internet Gateway
 resource "aws_internet_gateway" "igw" {
-  vpc_id = aws_vpc.Konvert_VPC.id
+  vpc_id     = aws_vpc.Konvert_VPC.id
   depends_on = [aws_vpc.Konvert_VPC]
 
   tags = {
@@ -70,12 +70,138 @@ resource "aws_route_table_association" "public_rt_assoc" {
 }
 
 
-#initiate load balancer subnets
+
+#Grap the AMI ID
+data "aws_ami" "ubuntu" {
+  most_recent = true
+
+  filter {
+    name   = "name"
+    values = ["ubuntu/images/hvm-ssd/ubuntu-focal-20.04-amd64-server-*"]
+  }
+
+  filter {
+    name   = "virtualization-type"
+    values = ["hvm"]
+  }
+
+  owners = ["099720109477"]
+
+}
+
+#Create EC2 in the public subnet
+
+resource "aws_instance" "app_server" {
+  ami                         = data.aws_ami.ubuntu.id
+  instance_type               = var.instance_type
+  subnet_id                   = element(aws_subnet.public.*.id, count.index)
+  count                       = 2
+  source_dest_check           = true
+  vpc_security_group_ids      = [aws_security_group.ec2_sg.id]
+  associate_public_ip_address = true
+  key_name                    = var.SSH_key_name
+
+  tags = {
+    Name = "${var.project_name}-EC2-${count.index + 1}"
+  }
+}
+
+# Add NCL for public subnet
+resource "aws_network_acl" "public_nacl" {
+  vpc_id = aws_vpc.Konvert_VPC.id
+  tags = {
+    Name = "${var.project_name}-public-nacl"
+  }
+}
+
+# 1. Allow Outbound Traffic (Permits the request to leave the EC2)
+# Rule 100: Allows all outbound connections to the Internet.
+resource "aws_network_acl_rule" "outbound_all" {
+  network_acl_id = aws_network_acl.public_nacl.id
+  rule_number    = 100
+  protocol       = "-1" 
+  rule_action    = "allow"
+  cidr_block     = "0.0.0.0/0"
+  egress         = true
+}
+
+# 2. Allow Inbound SSH (For management/Ansible. TCP traffic)
+# Rule 200: Allows inbound SSH traffic.
+resource "aws_network_acl_rule" "inbound_ssh" {
+  network_acl_id = aws_network_acl.public_nacl.id
+  rule_number    = 200
+  protocol       = "tcp"
+  rule_action    = "allow"
+  cidr_block     = "0.0.0.0/0"
+  from_port      = 22
+  to_port        = 22
+}
+
+# 3. Allow Inbound Ephemeral Ports (CRITICAL FIX: Permits the TCP response to return)
+# Rule 300: Allows return traffic for outbound TCP requests (like apt update/Docker key).
+resource "aws_network_acl_rule" "inbound_ephemeral" {
+  network_acl_id = aws_network_acl.public_nacl.id
+  rule_number    = 300
+  protocol       = "tcp"
+  rule_action    = "allow"
+  cidr_block     = "0.0.0.0/0"
+  
+}
+
+# 4. Allow Inbound ICMP (Required for ping 8.8.8.8 to work)
+# Rule 400: Allows ICMP packets (ping replies) to come back.
+resource "aws_network_acl_rule" "inbound_icmp" {
+  network_acl_id = aws_network_acl.public_nacl.id
+  rule_number    = 400
+  protocol       = "icmp" 
+  rule_action    = "allow"
+  cidr_block     = "0.0.0.0/0"
+  icmp_type           = -1 
+  icmp_code           = -1
+  egress             = false 
+}
+
+# The temporary "inbound_all_test" is REMOVED as it is redundant and dangerous.
+
+# Associate the Custom NACL with the Public Subnets
+resource "aws_network_acl_association" "public_nacl_assoc" {
+  count          = length(aws_subnet.public.*.id)
+  network_acl_id = aws_network_acl.public_nacl.id
+  subnet_id      = aws_subnet.public.*.id[count.index]
+}
+
+#Create Security Group for EC2
+resource "aws_security_group" "ec2_sg" {
+  name        = "${var.project_name}-ec2_sg"
+  description = "Allow HTTP traffic to EC2 instances"
+  vpc_id      = aws_vpc.Konvert_VPC.id
+  ingress {
+    from_port   = 80
+    to_port     = 80
+    protocol    = "tcp"
+    security_groups = [aws_security_group.alb_sg.id]
+  }
+  ingress {
+    from_port   = 22
+    to_port     = 22
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+  egress {
+    from_port = 0
+    to_port   = 0
+    cidr_blocks = ["0.0.0.0/0"]
+    protocol  = "-1"
+  }
+}
+
+
+#Create Application load balancer (ALB) subnets
 resource "aws_lb" "Konvert_ALB" {
   subnets            = aws_subnet.public.*.id
   name               = "${var.project_name}-alb"
   load_balancer_type = "application"
-  internal          = false
+  internal           = false
   security_groups    = [aws_security_group.alb_sg.id]
   tags = {
     Name = "${var.project_name}-alb"
@@ -84,10 +210,10 @@ resource "aws_lb" "Konvert_ALB" {
 
 #ALB Target Group
 resource "aws_lb_target_group" "alb_target_group" {
-  name     = "${var.project_name}-target-group"
-  port     = 80
-  protocol = "HTTP"
-  vpc_id   = aws_vpc.Konvert_VPC.id
+  name        = "${var.project_name}-target-group"
+  port        = 80
+  protocol    = "HTTP"
+  vpc_id      = aws_vpc.Konvert_VPC.id
   target_type = "instance"
   health_check {
     path                = "/"
@@ -111,8 +237,6 @@ resource "aws_lb_listener" "alb_listener" {
     target_group_arn = aws_lb_target_group.alb_target_group.arn
   }
 }
-
-
 
 #Allow HTTP and HTTPS traffic
 resource "aws_security_group" "alb_sg" {
@@ -141,53 +265,6 @@ resource "aws_security_group" "alb_sg" {
   }
 }
 
-#Grap the AMI ID
-data "aws_ami" "ubuntu" {
-  most_recent = true
-
-  filter {
-    name   = "name"
-    values = ["ubuntu/images/hvm-ssd/ubuntu-focal-20.04-amd64-server-*"]
-  }
-
-  filter {
-    name   = "virtualization-type"
-    values = ["hvm"]
-  }
-
-  owners = ["099720109477"]
-
-}
-
-#Create EC2 in the public subnet
-
-resource "aws_instance" "app_server" {
-  ami                         = data.aws_ami.ubuntu.id
-  instance_type               = var.instance_type
-  subnet_id                   = element(aws_subnet.public.*.id, count.index)
-  count                       = 2
-  vpc_security_group_ids      = [aws_security_group.ec2_sg.id]
-  associate_public_ip_address = true
-
-  tags = {
-    Name = "${var.project_name}-EC2-${count.index + 1}"
-  }
-}
-
-#Create Security Group for EC2
-resource "aws_security_group" "ec2_sg" {
-  name        = "${var.project_name}-ec2_sg"
-  description = "Allow HTTP traffic to EC2 instances"
-  vpc_id      = aws_vpc.Konvert_VPC.id
-  ingress {
-    from_port   = 80
-    to_port     = 80
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-}
-
-
 #Create DB Subnet Group
 resource "aws_db_subnet_group" "konvert_db_subnet" {
   name       = "${var.project_name}-db-subnet-group"
@@ -195,60 +272,62 @@ resource "aws_db_subnet_group" "konvert_db_subnet" {
 }
 
 #Create RDS in the private subnet
-resource "aws_db_instance" "konvert_db" {
-  identifier          = "${var.project_name}-primary-db"
-  allocated_storage    = 20
-  engine               = "mysql"
-  backup_retention_period = 1
-  engine_version       = "8.0"
-  instance_class       = "db.t3.micro"
-  db_name              = "${var.project_name}_db"
-  username             = var.db_username
-  password             = var.db_password
-  parameter_group_name = "default.mysql8.0"
-  skip_final_snapshot  = true
-  db_subnet_group_name = aws_db_subnet_group.konvert_db_subnet.id
+#resource "aws_db_instance" "konvert_db" {
+#  identifier              = "${var.project_name}-primary-db"
+#  allocated_storage       = 20
+#  engine                  = "mysql"
+#  backup_retention_period = 1
+#  engine_version          = "8.0"
+#  instance_class          = "db.t3.micro"
+#  db_name                 = "${var.project_name}_db"
+#  username                = var.db_username
+#  password                = var.db_password
+#  vpc_security_group_ids  = [aws_security_group.rds_sg.id]
+#  parameter_group_name    = "default.mysql8.0"
+#  skip_final_snapshot     = true
+#  db_subnet_group_name    = aws_db_subnet_group.konvert_db_subnet.id
 
 
-  tags = {
-    Name = "${var.project_name}-RDS"
-  }
-}
-
-#create Security Group for RDS
-resource "aws_security_group" "rds_sg" {
-  name        = "${var.project_name}-rds_sg"
-  description = "Allow traffic to RDS instances"
-  vpc_id      = aws_vpc.Konvert_VPC.id
-  ingress {
-    from_port       = 3306
-    to_port         = 3306
-    protocol        = "tcp"
-    security_groups = [aws_security_group.ec2_sg.id]
-  }
-
-  egress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-  }
-}
-
+#  tags = {
+#    Name = "${var.project_name}-RDS"
+#  }
+#}
 
 
 #Create replica for RDS
-resource "aws_db_instance" "konvert_db_replica" {
-  depends_on          = [aws_db_instance.konvert_db]
-  identifier          = "${var.project_name}-replica-db"
-  replicate_source_db  = aws_db_instance.konvert_db.identifier
-  instance_class       = "db.t3.micro"
-  parameter_group_name = "default.mysql8.0"
-  skip_final_snapshot  = true
+#resource "aws_db_instance" "konvert_db_replica" {
+#  depends_on           = [aws_db_instance.konvert_db]
+#  identifier           = "${var.project_name}-replica-db"
+#  replicate_source_db  = aws_db_instance.konvert_db.identifier
+#  instance_class       = "db.t3.micro"
+#  vpc_security_group_ids  = [aws_security_group.rds_sg.id]
+#  parameter_group_name = "default.mysql8.0"
+#  skip_final_snapshot  = true
 
-  tags = {
-    Name = "${var.project_name}-RDS-Replica"
-  }
-}
+#  tags = {
+#    Name = "${var.project_name}-RDS-Replica"
+#  }
+#}
+
+#Create Security Group for RDS
+#resource "aws_security_group" "rds_sg" {
+#  name        = "${var.project_name}-rds_sg"
+#  description = "Allow traffic to RDS instances"
+#  vpc_id      = aws_vpc.Konvert_VPC.id
+#  ingress {
+#    from_port       = 3306
+#    to_port         = 3306
+#    protocol        = "tcp"
+#    security_groups = [aws_security_group.ec2_sg.id]
+#  }
+
+#  egress {
+#    from_port = 0
+#    to_port   = 0
+#    protocol  = "-1"
+#  }
+#}
+
 
 # WAF Web ACL
 resource "aws_wafv2_web_acl" "konvert_waf" {
@@ -283,5 +362,48 @@ resource "aws_wafv2_web_acl_association" "konvert_waf_alb" {
 output "ec2_public_ip_addresses" {
   description = "The public IPs of the EC2 instances"
   value       = aws_instance.app_server.*.public_ip
+}
+
+
+resource "null_resource" "ansible_provisioning" {
+  # Trigger only when the instance is created or its IP changes
+  triggers = {
+    ec2_public_ip_address = join(" ", aws_instance.app_server.*.public_ip)
+  }
+
+  provisioner "local-exec" {
+    interpreter = ["/bin/bash", "-c"]
+
+    working_dir = "/home/lenovo/DevOps/Konvert-web-to-convert/infrastructure/Ansible"
+
+    command = <<-EOT
+      set -e
+
+      echo "Waiting for EC2 SSH to be ready..."
+
+      # Wait for SSH on every EC2 instance
+      for ip in ${join(" ", aws_instance.app_server.*.public_ip)}; do
+        echo "Waiting for SSH on $ip ..."
+        until nc -z -w5 $ip 22; do
+          echo "SSH not ready on $ip yet... retrying in 5s"
+          sleep 5
+        done
+        echo "SSH is ready on $ip"
+      done
+
+
+      echo "[webservers]" > temp_inventory
+
+      # Loop through all instance public IPs
+      for ip in ${join(" ", aws_instance.app_server.*.public_ip)}; do
+        echo "$ip ansible_user=ubuntu ansible_ssh_private_key_file=/home/lenovo/Downloads/SSH-key.pem" >> temp_inventory
+      done
+
+      ansible-playbook -i temp_inventory playbook.yaml
+
+      rm temp_inventory
+      
+    EOT
+  }
 }
 
