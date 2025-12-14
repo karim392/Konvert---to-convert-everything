@@ -1,0 +1,46 @@
+---
+
+
+- name: Install Docker
+  hosts: all
+  gather_facts: yes
+  become: yes
+  tasks:
+
+    - name: Install prerequisite packages
+      apt:
+        name:
+          - python3
+          - curl
+          - git
+        state: present
+
+   # 2) Install Docker
+    - name: Install Docker using official script
+      shell: curl -fsSL https://get.docker.com | sh
+    
+    # 3) Ensure Docker is running
+    - name: Ensure Docker service is enabled and started
+      service:
+        name: docker
+        state: started
+        enabled: yes
+
+   # 4) pull the Docker image from Docker Hub
+    - name: Pull Docker image from Docker Hub
+      docker_image:
+        name: karimrushdy/konvert_to_convert:latest
+        source: pull
+
+    # 5) Run the Docker container
+    - name: Run Docker container
+      docker_container:
+        name: konvert_to_convert_container
+        image: karimrushdy/konvert_to_convert:latest
+        state: started
+        restart_policy: always
+        ports:
+          - "3000:3000"
+   
+    
+
