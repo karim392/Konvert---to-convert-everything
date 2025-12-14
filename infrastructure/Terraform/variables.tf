@@ -30,11 +30,16 @@ variable "db_password" {
 # EC2 instance type
 variable "instance_type" {
   type    = string
-  default = "t2.micro"
+  default = "t3.micro"
 }
 
 # AMI ID for EC2 instances
 variable "ami_id" {
   type = string
 
-} 
+}
+
+# SSH Key Name for EC2 instances
+variable "SSH_key_name" {
+  type = string
+}
