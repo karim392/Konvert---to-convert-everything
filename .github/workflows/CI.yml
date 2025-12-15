@@ -34,16 +34,16 @@ jobs:
 # CD
 
 #setup terraform
-      - name: Set up Terraform
-        uses: hashicorp/setup-terraform@v2
-        with:
-          terraform_version: 1.5.6
+      # - name: Set up Terraform
+      #   uses: hashicorp/setup-terraform@v2
+      #   with:
+      #     terraform_version: 1.5.6
 
-      - name: Get EC2 Public IP from Terraform Output
-        id: get_ec2_ip
-        run: |
-          EC2_IP=$(terraform output -raw ec2_public_ip_address)
-          echo "ec2_ip_address=$EC2_IP" >> $GITHUB_OUTPUT
+      # - name: Get EC2 Public IP from Terraform Output
+      #   id: get_ec2_ip
+      #   run: |
+      #     EC2_IP=$(terraform output -raw ec2_public_ip_address)
+      #     echo "ec2_ip_address=$EC2_IP" >> $GITHUB_OUTPUT
     
 
 
@@ -72,13 +72,14 @@ jobs:
       - name: SSH and deploy container
         uses: appleboy/ssh-action@v0.1.7
         with:
-          host: ${{ steps.get_ec2_ip.outputs.ec2_ip_address }}
+          host: ${{ steps.ec2_public_ip_address.output.tf.ec2_ip_address }}
           username: ubuntu
           key: ${{ secrets.EC2SSH }}
           script: |
             docker pull karimrushdy/konvert_to_convert:latest
             docker stop konvert_container || true
             docker rm konvert_container || true
-            docker run -d --name konvert_container -p 3000:3000 karimrushdy/konvert_to_convert:latest
+            docker run -d --name konvert_container -p 80:3000 karimrushdy/konvert_to_convert:latest
 
-#
+
+
