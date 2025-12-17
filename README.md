@@ -154,7 +154,7 @@ on:
 ---
 
 
-🔐 Secrets Management
+🔐 **Secrets Management**
 
 The following secrets are stored securely in GitHub Actions Secrets:
 
@@ -166,7 +166,7 @@ SSH_PRIVATE_KEY
 
 ---
 
-📌 How to Access the App
+📌 **How to Access the App**
 
 After deployment, access the application via:
 
