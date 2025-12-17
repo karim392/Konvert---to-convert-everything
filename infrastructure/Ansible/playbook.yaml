@@ -1,38 +1,48 @@
 ---
 
-
-- name: Install Docker
+- name: Install Docker on Ubuntu
   hosts: all
-  gather_facts: yes
-  become: yes
+  become: true
   tasks:
 
-    - name: Install prerequisite packages
+
+    - name: Install dependencies
       apt:
-        name:
-          - python3
-          - curl
-          - git
+        name: "{{ item }}"
+        state: present
+      loop:
+        - apt-transport-https
+        - ca-certificates
+        - curl
+        - gnupg
+        - lsb-release
+
+
+    - name: Add Docker GPG key
+      apt_key:
+        url: https://download.docker.com/linux/ubuntu/gpg
         state: present
 
-   # 2) Install Docker
-    - name: Install Docker using official script
-      shell: curl -fsSL https://get.docker.com | sh
-    
-    # 3) Ensure Docker is running
-    - name: Ensure Docker service is enabled and started
-      service:
-        name: docker
-        state: started
-        enabled: yes
 
-   # 4) pull the Docker image from Docker Hub
+    - name: Add Docker APT repository
+      apt_repository:
+        repo: deb [arch=amd64] https://download.docker.com/linux/ubuntu focal stable
+        state: present
+
+
+    - name: Install Docker Engine
+      apt:
+        name: docker-ce
+        state: present
+        update_cache: true
+
+
     - name: Pull Docker image from Docker Hub
       docker_image:
         name: karimrushdy/konvert_to_convert:latest
         source: pull
+ 
 
-    # 5) Run the Docker container
     - name: Run Docker container
       docker_container:
         name: konvert_to_convert_container
@@ -40,7 +50,7 @@
         state: started
         restart_policy: always
         ports:
-          - "3000:3000"
+          - "80:3000"
    
     
 
