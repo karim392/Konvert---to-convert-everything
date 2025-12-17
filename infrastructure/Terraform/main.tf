@@ -106,70 +106,6 @@ resource "aws_instance" "app_server" {
   }
 }
 
-# Add NCL for public subnet
-resource "aws_network_acl" "public_nacl" {
-  vpc_id = aws_vpc.Konvert_VPC.id
-  tags = {
-    Name = "${var.project_name}-public-nacl"
-  }
-}
-
-# 1. Allow Outbound Traffic (Permits the request to leave the EC2)
-# Rule 100: Allows all outbound connections to the Internet.
-resource "aws_network_acl_rule" "outbound_all" {
-  network_acl_id = aws_network_acl.public_nacl.id
-  rule_number    = 100
-  protocol       = "-1" 
-  rule_action    = "allow"
-  cidr_block     = "0.0.0.0/0"
-  egress         = true
-}
-
-# 2. Allow Inbound SSH (For management/Ansible. TCP traffic)
-# Rule 200: Allows inbound SSH traffic.
-resource "aws_network_acl_rule" "inbound_ssh" {
-  network_acl_id = aws_network_acl.public_nacl.id
-  rule_number    = 200
-  protocol       = "tcp"
-  rule_action    = "allow"
-  cidr_block     = "0.0.0.0/0"
-  from_port      = 22
-  to_port        = 22
-}
-
-# 3. Allow Inbound Ephemeral Ports (CRITICAL FIX: Permits the TCP response to return)
-# Rule 300: Allows return traffic for outbound TCP requests (like apt update/Docker key).
-resource "aws_network_acl_rule" "inbound_ephemeral" {
-  network_acl_id = aws_network_acl.public_nacl.id
-  rule_number    = 300
-  protocol       = "tcp"
-  rule_action    = "allow"
-  cidr_block     = "0.0.0.0/0"
-  
-}
-
-# 4. Allow Inbound ICMP (Required for ping 8.8.8.8 to work)
-# Rule 400: Allows ICMP packets (ping replies) to come back.
-resource "aws_network_acl_rule" "inbound_icmp" {
-  network_acl_id = aws_network_acl.public_nacl.id
-  rule_number    = 400
-  protocol       = "icmp" 
-  rule_action    = "allow"
-  cidr_block     = "0.0.0.0/0"
-  icmp_type           = -1 
-  icmp_code           = -1
-  egress             = false 
-}
-
-# The temporary "inbound_all_test" is REMOVED as it is redundant and dangerous.
-
-# Associate the Custom NACL with the Public Subnets
-resource "aws_network_acl_association" "public_nacl_assoc" {
-  count          = length(aws_subnet.public.*.id)
-  network_acl_id = aws_network_acl.public_nacl.id
-  subnet_id      = aws_subnet.public.*.id[count.index]
-}
-
 #Create Security Group for EC2
 resource "aws_security_group" "ec2_sg" {
   name        = "${var.project_name}-ec2_sg"
@@ -225,6 +161,15 @@ resource "aws_lb_target_group" "alb_target_group" {
     unhealthy_threshold = 2
   }
 }
+
+#Associate EC2 instances with ALB Target Group
+resource "aws_lb_target_group_attachment" "alb_target_attachment" {
+  count            = length(aws_instance.app_server.*.id)
+  target_group_arn = aws_lb_target_group.alb_target_group.arn
+  target_id        = element(aws_instance.app_server.*.id, count.index)
+  port             = 80
+}
+
 
 #ALB Listener
 resource "aws_lb_listener" "alb_listener" {
