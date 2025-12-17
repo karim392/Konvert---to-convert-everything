@@ -1,3 +1,16 @@
 .terraform/
 app/package*.json
 test.sh
+infrastructure/Ansible/temp_inventory
+infrastructure/terraform/temp_inventory
+infrastructure/terraform.tfstate
+infrastructure/terraform.tfstate.backup
+infrastructure/Terraform/.terraform/
+infrastructure/Terraform/terraform.tfstate
+infrastructure/Terraform/terraform.tfstate.backup
+infrastructure/Ansible/playbook.yaml.bak
+infrastructure/Ansible/*.vscode/
+infrastructure/Terraform/*.vscode/
+temp_inventory
+terraform.tfstate
+terraform.tfstate.backup
