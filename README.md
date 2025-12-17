@@ -42,7 +42,6 @@ Terraform provisions the full AWS infrastructure including:
 - VPC and 4 Subnets (2 public subnets for application and 2 private subnets for DB and Replica)
 - Internet Gateway and Route Tables
 - Security Groups
-- NCL
 - EC2 instances
 - Application Load Balancer
 - WAF
