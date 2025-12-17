@@ -29,7 +29,7 @@ jobs:
       - name: Run node.js tests
         run: |
          npm install jest
-         npm test
+         npx jest
         
 
 # CD
