@@ -28,7 +28,7 @@ jobs:
 
       - name: Run node.js tests
         run: |
-         npm install jest && npx jest
+         npm install jest
          npm test
         
 
