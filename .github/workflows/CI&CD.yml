@@ -71,7 +71,12 @@ jobs:
 
     - name: Get EC2 IP
       id: get_ip
-      run: echo "ec2_ip=$(terraform output -raw ec2_public_ip_address)" >> $GITHUB_OUTPUT
+      run: |
+        # 1. Get the list of IPs from Terraform in JSON format
+        # 2. Use jq to join them with a comma: "IP1,IP2"
+        # 3. Save the result to $GITHUB_OUTPUT
+        IPS=$(terraform output -json ec2_public_ip_address | jq -r 'join(",")')
+        echo "ec2_ips=$IPS" >> $GITHUB_OUTPUT
       
     - name: Log in to Docker Hub
       uses: docker/login-action@v2
