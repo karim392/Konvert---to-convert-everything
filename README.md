@@ -42,7 +42,6 @@ Terraform provisions the full AWS infrastructure including:
 - VPC and 4 Subnets (2 public subnets for application and 2 private subnets for DB and Replica)
 - Internet Gateway and Route Tables
 - Security Groups
-- NCL
 - EC2 instances
 - Application Load Balancer
 - WAF
@@ -155,7 +154,7 @@ on:
 ---
 
 
-🔐 Secrets Management
+🔐 **Secrets Management**
 
 The following secrets are stored securely in GitHub Actions Secrets:
 
@@ -167,7 +166,7 @@ SSH_PRIVATE_KEY
 
 ---
 
-📌 How to Access the App
+📌 **How to Access the App**
 
 After deployment, access the application via:
 
