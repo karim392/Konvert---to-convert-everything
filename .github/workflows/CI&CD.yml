@@ -49,30 +49,35 @@ jobs:
 
 
 #Log in Docker Hub
-      - name: Log in to Docker Hub
-        uses: docker/login-action@v2
-        with:
-          username: ${{ secrets.DOCKER_HUB_USERNAME }}
-          password: ${{ secrets.DOCKER_HUB_PATOKEN }}
-
+     
 
 #Build and push Docker image
   deploy:
     needs: build
     runs-on: ubuntu-latest
     steps:
-      - name: Deploy to Docker Hub
-        uses: docker/build-push-action@v4
-        with:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Log in to Docker Hub
+      uses: docker/login-action@v2
+      with:
+          username: ${{ secrets.DOCKER_HUB_USERNAME }}
+          password: ${{ secrets.DOCKER_HUB_PATOKEN }}
+
+        
+    - name: Deploy to Docker Hub
+      uses: docker/build-push-action@v4
+      with:
           context: .
           push: true
           tags: karimrushdy/konvert_to_convert:latest
 
 
 # Pull and run the Docker container on AWS EC2 instance
-      - name: SSH and deploy container
-        uses: appleboy/ssh-action@v0.1.7
-        with:
+    - name: SSH and deploy container
+      uses: appleboy/ssh-action@v0.1.7
+      with:
           host: ${{ steps.ec2_public_ip_address.output.tf.ec2_ip_address }}
           username: ubuntu
           key: ${{ secrets.EC2SSH }}
@@ -82,5 +87,5 @@ jobs:
             docker rm konvert_container || true
             docker run -d --name konvert_container -p 80:3000 karimrushdy/konvert_to_convert:latest
 
-      - name: Image Info
-        run: docker images
+    - name: Image Info
+      run: docker images
