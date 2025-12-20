@@ -1,3 +1,4 @@
+
 name: Node JS web CI
 
 on:
@@ -59,6 +60,19 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v3
 
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v2
+      with:
+          terraform_wrapper: false # Crucial for raw output capture
+
+    - name: Terraform Init
+      run: terraform init
+      working-directory: ./infrastructure/Terraform
+
+    - name: Get EC2 IP
+      id: get_ip
+      run: echo "ec2_ip=$(terraform output -raw ec2_public_ip_address)" >> $GITHUB_OUTPUT
+      
     - name: Log in to Docker Hub
       uses: docker/login-action@v2
       with:
@@ -79,7 +93,7 @@ jobs:
     - name: SSH and deploy container
       uses: appleboy/ssh-action@v0.1.7
       with:
-          host: ${{ steps.ec2_public_ip_address.output.tf.ec2_ip_address }}
+          host: ${{ steps.get_ip.output.ec2_ip_address }}
           username: ubuntu
           key: ${{ secrets.EC2SSH }}
           script: |
