@@ -4,11 +4,11 @@ FROM node:18-alpine AS builder
 
 WORKDIR /app
 
-COPY ./app/package.json ./
+COPY package*.json ./
 
 RUN npm install
 
-COPY ./app ./
+COPY . .
 
 FROM node:18-alpine
 
@@ -19,6 +19,4 @@ COPY --from=builder /app ./
 EXPOSE 3000
 
 CMD ["node", "server.js"]
-
-#test comment
 
