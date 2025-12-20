@@ -32,7 +32,7 @@ jobs:
          npx jest
         
 
-# CD
+#CD
 
 #setup terraform
       # - name: Set up Terraform
