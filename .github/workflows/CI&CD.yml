@@ -109,7 +109,7 @@ jobs:
         docker pull karimrushdy/konvert_to_convert:latest
         docker stop konvert_container || true
         docker rm konvert_container || true
-        docker run -d --name konvert_container -p 80:3000 yourdockerhub/konvert_to_convert:latest
+        docker run -d --name konvert_container -p 80:3000 karimrushdy/konvert_to_convert:latest
 
 
     - name: Image Info
