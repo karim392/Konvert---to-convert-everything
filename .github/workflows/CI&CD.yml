@@ -88,7 +88,8 @@ jobs:
     - name: SSH and deploy container
       uses: appleboy/ssh-action@v0.1.7
       with:
-          host: ${{ steps.get_ip.output.ec2_ips }}
+         # host: ${{ steps.get_ip.output.ec2_ips }}
+          host: ${{ secrets.EC2_IPS }}
           username: ubuntu
           key: ${{ secrets.EC2SSH }}
           script: |
