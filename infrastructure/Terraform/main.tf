@@ -352,3 +352,11 @@ resource "null_resource" "ansible_provisioning" {
   }
 }
 
+
+# terraform {
+#   backend "s3" {
+#     bucket = "${var.project_name}-static-files-bucket"
+#     key    = "state/terraform.tfstate"
+#     region = var.region
+#   }
+# }
