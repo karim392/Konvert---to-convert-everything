@@ -52,5 +52,9 @@
         ports:
           - "80:3000"
    
-    
+    - name: Add deploy public key to EC2 user
+      authorized_key:
+        user: ubuntu                 
+        state: present
+        key: "{{ lookup('file', '~/Downloads/github_actions_key.pub') }}"
 
