@@ -1,47 +1,196 @@
-name: CI/CD Pipeline
+# name: Node JS web CI
+# on:
+#   push:
+#     branches:
+#       - main
+
+#   pull_request:
+#     branches:
+#       - main
+
+
+# jobs:
+#   build:
+#     runs-on: ubuntu-latest
+    
+#     steps:
+#       - uses: actions/checkout@v3
+
+#       - name: Set up node.js
+#         uses: actions/setup-node@v4
+#         with:
+#           node-version: '18'
+
+#       - name: Install dependencies
+#         run: npm install
+#         working-directory: ./app
+
+#       - name: Run node.js tests
+#         run: |
+#          npm install jest
+#          npx jest
+        
+# # CD
+
+# #setup terraform
+#       # - name: Set up Terraform
+#       #   uses: hashicorp/setup-terraform@v2
+#       #   with:
+#       #     terraform_version: 1.5.6
+
+#       # - name: Get EC2 Public IP from Terraform Output
+#       #   id: get_ec2_ip
+#       #   run: |
+#       #     EC2_IP=$(terraform output -raw ec2_public_ip_address)
+#       #     echo "ec2_ip_address=$EC2_IP" >> $GITHUB_OUTPUT
+    
+
+
+# #Log in Docker Hub
+     
+
+# #Build and push Docker image
+#   deploy:
+#     needs: build
+#     runs-on: ubuntu-latest
+#     steps:
+#     - name: Checkout code
+#       uses: actions/checkout@v3
+
+#     - name: Log in to Docker Hub
+#       uses: docker/login-action@v2
+#       with:
+#           username: ${{ secrets.DOCKER_HUB_USERNAME }}
+#           password: ${{ secrets.DOCKER_HUB_PATOKEN }}
+
+        
+#     - name: Deploy to Docker Hub
+#       uses: docker/build-push-action@v4
+#       with:
+#           context: .
+#           file: ./Dockerfile
+#           push: true
+#           tags: karimrushdy/konvert_to_convert:latest
+
+
+# # Pull and run the Docker container on AWS EC2 instance
+#     - name: SSH and deploy container
+#       uses: appleboy/ssh-action@v0.1.7
+#       with:
+#           host: ${{ steps.ec2_public_ip_address.output.ec2_ip_address }}
+#           username: ubuntu
+#           key: ${{ secrets.EC2SSH }}
+#           script: |
+#             docker pull karimrushdy/konvert_to_convert:latest
+#             docker stop konvert_container || true
+#             docker rm konvert_container || true
+#             docker run -d --name konvert_container -p 80:3000 karimrushdy/konvert_to_convert:latest
+#     - name: Image Info
+#       run: docker images
+
+
+name: Node JS web CI
 
 on:
   push:
-    branches: [ "main" ]
+    branches:
+      - main
+
+  pull_request:
+    branches:
+      - main
+
 
 jobs:
-  build-and-push:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Set up node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Install dependencies
+        run: npm install
+        working-directory: ./app
+
+      - name: Run node.js tests
+        run: |
+         npm install jest
+         npx jest
+        
+
+#CD
+
+#setup terraform
+      # - name: Set up Terraform
+      #   uses: hashicorp/setup-terraform@v2
+      #   with:
+      #     terraform_version: 1.5.6
+
+      # - name: Get EC2 Public IP from Terraform Output
+      #   id: get_ec2_ip
+      #   run: |
+      #     EC2_IP=$(terraform output -raw ec2_public_ip_address)
+      #     echo "ec2_ip_address=$EC2_IP" >> $GITHUB_OUTPUT
+    
+
+
+#Log in Docker Hub
+     
+
+#Build and push Docker image
+  deploy:
+    needs: build
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4
+    - name: Checkout code
+      uses: actions/checkout@v3
 
-      - name: Build Docker Image for Testing
-        run: |
-          docker build -t myapp-test .
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v2
+      with:
+          terraform_wrapper: false # Crucial for raw output capture
 
-      - name: Run Container for Testing
-        run: |
-          docker run -d -p 80:3000 --name myapp-test myapp-test
-          
-      - name: Test Server
-        run: |
-          sleep 5
-          curl -f http://localhost:3000 || exit 1
+    - name: Terraform Init
+      run: terraform init
+      working-directory: ./infrastructure/Terraform
 
-      - name: Stop & Remove Test Container
-        run: |
-          docker stop myapp-test
-          docker rm myapp-test
-
-      - name: Login to Docker Hub
-        uses: docker/login-action@v3
-        with:
+    - name: Get EC2 IP
+      id: get_ip
+      run: echo "ec2_ip=$(terraform output -raw ec2_public_ip_address)" >> $GITHUB_OUTPUT
+      
+    - name: Log in to Docker Hub
+      uses: docker/login-action@v2
+      with:
           username: ${{ secrets.DOCKER_HUB_USERNAME }}
-          password: ${{ secrets.DDOCKER_HUB_PATOKEN }}
+          password: ${{ secrets.DOCKER_HUB_PATOKEN }}
 
-      - name: Build & Push Docker Image
-        uses: docker/build-push-action@v5
-        with:
+        
+    - name: Deploy to Docker Hub
+      uses: docker/build-push-action@v4
+      with:
           context: .
-          file: ./Dockerfile
+          file: ./app/Dockerfile
           push: true
-          tags: ${{ secrets.DOCKERHUB_USERNAME }}/konvert_to_convert:latest
+          tags: karimrushdy/konvert_to_convert:latest
 
-      - name: Image Info
-        run: docker images
+
+# Pull and run the Docker container on AWS EC2 instance
+    - name: SSH and deploy container
+      uses: appleboy/ssh-action@v0.1.7
+      with:
+          host: ${{ steps.get_ip.output.ec2_ip_address }}
+          username: ubuntu
+          key: ${{ secrets.EC2SSH }}
+          script: |
+            docker pull karimrushdy/konvert_to_convert:latest
+            docker stop konvert_container || true
+            docker rm konvert_container || true
+            docker run -d --name konvert_container -p 80:3000 karimrushdy/konvert_to_convert:latest
+
+    - name: Image Info
+      run: docker images
